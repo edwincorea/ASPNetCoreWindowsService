@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.WindowsServices;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace ASPNetCoreWindowsService
 {
@@ -12,22 +13,38 @@ namespace ASPNetCoreWindowsService
         {
             //CreateWebHostBuilder(args).Build().Run();
 
-            CreateWebHostBuilder(args).Build().RunAsService();
+            CreateWebHostBuilder(args);
         }
 
-        public static IWebHostBuilder CreateWebHostBuilder(string[] args)
+        public static void CreateWebHostBuilder(string[] args)
         {
             //var host = WebHost.CreateDefaultBuilder(args)
             //    .UseStartup<Startup>();
 
-            var pathToExe = Process.GetCurrentProcess().MainModule.FileName;
-            var pathToContentRoot = Path.GetDirectoryName(pathToExe);
+            var isService = !(Debugger.IsAttached || args.Contains("--console"));
+            var pathToContentRoot = Directory.GetCurrentDirectory();
+            var webHostArgs = args.Where(arg => arg != "--console").ToArray();
 
-            var host = WebHost.CreateDefaultBuilder(args)
+            if (isService)
+            {
+                var pathToExe = Process.GetCurrentProcess().MainModule.FileName;
+                pathToContentRoot = Path.GetDirectoryName(pathToExe);
+            }
+
+
+            var host = WebHost.CreateDefaultBuilder(webHostArgs)
                 .UseContentRoot(pathToContentRoot)
-                .UseStartup<Startup>();
+                .UseStartup<Startup>()
+                .Build();
 
-            return host;
+            if (isService)
+            {
+                host.RunAsService();
+            }
+            else
+            {
+                host.Run();
+            }
         }
     }
 }
